@@ -1,92 +1,213 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Button,
+  Center,
+  Flex,
+  Heading,
+  IconButton,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuList,
+  Spacer,
+  Spinner,
+  VStack,
+} from '@chakra-ui/react';
+import {
+  FaEllipsisV,
+  FaPlus,
+  FaRegEdit,
+  FaRegListAlt,
+  FaRegTrashAlt,
+} from 'react-icons/fa';
 
-const List = (props) => (
-    <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-      <td className="p-4 align-middle [&amp;:has([role=checkbox])]:pr-0">
-        {props.list.name}
-      </td>
-      <td className="p-4 align-middle [&amp;:has([role=checkbox])]:pr-0">
-        <div className="flex gap-2">
-          <Link
-              className="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-slate-100 h-9 rounded-md px-3"
-              to={`/edit/${props.list._id}`}
-          >
-            Edit
-          </Link>
-          <button
-              className="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-slate-100 hover:text-accent-foreground h-9 rounded-md px-3"
-              color="red"
-              type="button"
-              onClick={() => {
-                props.deleteList(props.list._id);
-              }}
-          >
+import { ConfirmDeleteModal, RenameModal } from './modals.jsx';
+function List(props) {
+  return (
+    <Flex align='center'>
+      <Menu>
+        <MenuButton
+          as={IconButton}
+          aria-label='Actions'
+          size='sm'
+          variant='ghost'
+          icon={<FaEllipsisV />}
+        />
+        <MenuList>
+          <MenuItem icon={<FaRegListAlt />} onClick={() => props.selectList()}>
+            View
+          </MenuItem>
+          <MenuItem icon={<FaRegEdit />} onClick={() => props.editList()}>
+            Rename
+          </MenuItem>
+          <MenuItem icon={<FaRegTrashAlt />} onClick={() => props.deleteList()}>
             Delete
-          </button>
-        </div>
-      </td>
-    </tr>
-);
+          </MenuItem>
+        </MenuList>
+      </Menu>
+      <Spacer />
+      <Box cursor='pointer' w='200px' onClick={() => props.selectList()}>
+        {props.list.name}
+      </Box>
+    </Flex>
+  );
+}
 
 export default function Lists() {
+  const navigate = useNavigate();
+  const [creating, setCreating] = useState(false);
+  const [listToEdit, setListToEdit] = useState();
+  const [listIndexToDelete, setListIndexToDelete] = useState(-1);
   const [lists, setLists] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // This method fetches the lists from the database.
-  useEffect(() => {
-    async function getLists() {
-      const response = await fetch(`http://localhost:5050/lists/`);
-      if (!response.ok) {
-        const message = `An error occurred: ${response.statusText}`;
-        console.error(message);
-        return;
-      }
-      const lists = await response.json();
-      setLists(lists);
+  async function getLists() {
+    const response = await fetch(`http://localhost:5050/lists/`);
+    if (!response.ok) {
+      const message = `An error occurred: ${response.statusText}`;
+      console.error(message);
+      return;
     }
+    const lists = await response.json();
+    setLists(lists);
+    setLoading(false);
+  }
+
+  useEffect(() => {
     getLists();
-  }, [lists.length]);
+  }, []);
 
   // This method will delete a list
-  async function deleteList(id) {
-    await fetch(`http://localhost:5050/lists/${id}`, {
-      method: "DELETE",
-    });
-    const newLists = lists.filter((el) => el._id !== id);
-    setLists(newLists);
+  async function createList(name) {
+    try {
+      const response = await fetch('http://localhost:5050/lists', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: name }),
+      });
+      getLists();
+      const { insertedId } = await response.json();
+      if (insertedId) {
+        navigate(insertedId);
+      }
+      setCreating(false);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  async function updateList(updatedList) {
+    try {
+      await fetch(`http://localhost:5050/lists/${updatedList._id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedList),
+      });
+      getLists();
+      setListToEdit(null);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  // This method will delete a list
+  async function deleteList() {
+    try {
+      const listId = lists[listIndexToDelete]?._id;
+      if (listId) {
+        const response = await fetch(`http://localhost:5050/lists/${listId}`, {
+          method: 'DELETE',
+        });
+        const { acknowledged, deletedCount } = await response.json();
+        if (acknowledged && deletedCount === 1) {
+          const newLists = lists.filter((el) => el._id !== listId);
+          setLists(newLists);
+          setListIndexToDelete(-1);
+        }
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  function onClose() {
+    setCreating(false);
+    setListToEdit(null);
+  }
+
+  function onSave(newName) {
+    if (creating) {
+      createList(newName);
+    } else {
+      updateList({
+        ...listToEdit,
+        name: newName,
+      });
+    }
+  }
+
+  function existingNames() {
+    return lists.map((list) => list.name);
   }
 
   // This following section will display the table with the todo lists.
   return (
-      <>
-        <h3 className="text-lg font-semibold p-4">Todo Lists</h3>
-        <div className="border rounded-lg overflow-hidden">
-          <div className="relative w-full overflow-auto">
-            <table className="w-full caption-bottom text-sm">
-              <thead className="[&amp;_tr]:border-b">
-              <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&amp;:has([role=checkbox])]:pr-0">
-                  Name
-                </th>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&amp;:has([role=checkbox])]:pr-0">
-                  Action
-                </th>
-              </tr>
-              </thead>
-              <tbody className="[&amp;_tr:last-child]:border-0">
-              {lists.map((list) => {
-                return (
-                    <List
-                        list={list}
-                        deleteList={() => deleteList(list._id)}
-                        key={list._id}
-                    />
-                )
-              })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </>
+    <>
+      <Box>
+        <Heading as='h2' size='xl' textAlign='center'>
+          Todo Lists
+        </Heading>
+        {loading ? (
+          <Center height='80vh'>
+            <Spinner size='xl' />
+          </Center>
+        ) : (
+          <>
+            <VStack mt='1rem'>
+              {lists.map((list, index) => (
+                <List
+                  list={list}
+                  deleteList={() => setListIndexToDelete(index)}
+                  editList={() => setListToEdit(list)}
+                  selectList={() => navigate(list._id)}
+                  key={list._id}
+                />
+              ))}
+            </VStack>
+            <Button
+              colorScheme='teal'
+              size='sm'
+              leftIcon={<FaPlus />}
+              onClick={() => setCreating(true)}
+            >
+              New List
+            </Button>
+          </>
+        )}
+      </Box>
+      {(creating || !!listToEdit) && (
+        <RenameModal
+          resource='List'
+          initialValue={listToEdit?.name}
+          onClose={onClose}
+          onSave={onSave}
+          existingNames={existingNames()}
+        />
+      )}
+      {listIndexToDelete > -1 && (
+        <ConfirmDeleteModal
+          name={lists[listIndexToDelete]?.name}
+          onClose={() => setListIndexToDelete(-1)}
+          onDelete={() => deleteList()}
+        />
+      )}
+    </>
   );
 }

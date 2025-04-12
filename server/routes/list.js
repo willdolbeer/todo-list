@@ -24,8 +24,11 @@ router.get("/:id", async (req, res) => {
   let query = { _id: new ObjectId(req.params.id) };
   let result = await collection.findOne(query);
 
-  if (!result) res.send("Not found").status(404);
-  else res.send(result).status(200);
+  if (!result) {
+    res.send("Not found").status(404);
+  } else {
+    res.send(result).status(200);
+  }
 });
 
 // This section will help you create a new list.
@@ -33,12 +36,15 @@ router.post("/", async (req, res) => {
   try {
     let newDocument = {
       name: req.body.name,
-      position: req.body.position,
-      level: req.body.level,
+      tasks: [],
     };
     let collection = await db.collection("lists");
     let result = await collection.insertOne(newDocument);
-    res.send(result).status(204);
+    if (!result) {
+      res.status(500).send("Error adding list");
+    } else {
+      res.send(result).status(200);
+    }
   } catch (err) {
     console.error(err);
     res.status(500).send("Error adding list");
@@ -52,8 +58,7 @@ router.patch("/:id", async (req, res) => {
     const updates = {
       $set: {
         name: req.body.name,
-        position: req.body.position,
-        level: req.body.level,
+        tasks: req.body.tasks,
       },
     };
 

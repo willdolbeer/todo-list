@@ -1,15 +1,14 @@
-import { Outlet } from "react-router-dom";
-import Navbar from "./components/Navbar";
-import { ChakraProvider } from '@chakra-ui/react'
+import { ChakraProvider, Container } from '@chakra-ui/react';
+
+import { AppRouter } from './router.jsx';
 
 const App = () => {
   return (
-      <ChakraProvider>
-        <div className="w-full p-6">
-          <Navbar />
-          <Outlet />
-        </div>
-      </ChakraProvider>
+    <ChakraProvider>
+      <Container>
+        <AppRouter />
+      </Container>
+    </ChakraProvider>
   );
 };
-export default App
+export default App;
